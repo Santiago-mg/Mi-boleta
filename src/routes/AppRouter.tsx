@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { AdminRoute } from '../components/AdminRoute'
+import { MainLayout } from '../components/MainLayout'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { AuthProvider } from '../context/AuthContext'
 import { AdminTickets } from '../pages/AdminTickets'
@@ -21,14 +23,19 @@ export function AppRouter() {
           <Route path="/register" element={<Register />} />
 
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/tickets" element={<Tickets />} />
-            <Route path="/tickets/new" element={<TicketCreate />} />
-            <Route path="/tickets/:id/edit" element={<TicketEdit />} />
-            <Route path="/admin/tickets" element={<AdminTickets />} />
+            <Route element={<MainLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/tickets" element={<Tickets />} />
+              <Route path="/tickets/new" element={<TicketCreate />} />
+              <Route path="/tickets/:id/edit" element={<TicketEdit />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
+
+              <Route element={<AdminRoute />}>
+                <Route path="/admin/tickets" element={<AdminTickets />} />
+              </Route>
+            </Route>
           </Route>
 
-          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>

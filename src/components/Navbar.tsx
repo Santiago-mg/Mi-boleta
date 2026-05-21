@@ -1,0 +1,53 @@
+import { LayoutDashboard, LogOut, Plus, ShieldCheck, Ticket } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+
+import { useAuth } from '../context/AuthContext'
+
+export function Navbar() {
+  const { logout, user } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  return (
+    <header className="app-navbar">
+      <div className="brand-mark" aria-label="Mi Boleta">
+        <span>MB</span>
+      </div>
+
+      <nav className="app-nav" aria-label="Navegacion principal">
+        <NavLink to="/dashboard">
+          <LayoutDashboard size={18} />
+          Dashboard
+        </NavLink>
+        <NavLink to="/tickets">
+          <Ticket size={18} />
+          Tickets
+        </NavLink>
+        <NavLink to="/tickets/new">
+          <Plus size={18} />
+          Nueva
+        </NavLink>
+        {user?.role === 'admin' ? (
+          <NavLink to="/admin/tickets">
+            <ShieldCheck size={18} />
+            Admin
+          </NavLink>
+        ) : null}
+      </nav>
+
+      <div className="navbar-user">
+        <div>
+          <strong>{user?.name ?? 'Usuario'}</strong>
+          <span>{user?.email}</span>
+        </div>
+        <button className="icon-button" type="button" onClick={handleLogout} aria-label="Cerrar sesion">
+          <LogOut size={18} />
+        </button>
+      </div>
+    </header>
+  )
+}
