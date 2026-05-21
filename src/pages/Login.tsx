@@ -18,12 +18,14 @@ type LoginLocationState = {
   from?: {
     pathname?: string
   }
+  registeredEmail?: string
+  registrationMessage?: string
 }
 
-function getRedirectPath(state: unknown) {
+function getLocationState(state: unknown) {
   const locationState = state as LoginLocationState | null
 
-  return locationState?.from?.pathname ?? '/dashboard'
+  return locationState
 }
 
 export function Login() {
@@ -31,7 +33,8 @@ export function Login() {
   const location = useLocation()
   const navigate = useNavigate()
   const [formError, setFormError] = useState<string | null>(null)
-  const redirectPath = getRedirectPath(location.state)
+  const locationState = getLocationState(location.state)
+  const redirectPath = locationState?.from?.pathname ?? '/dashboard'
 
   const {
     formState: { errors, isSubmitting },
@@ -40,7 +43,7 @@ export function Login() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      email: locationState?.registeredEmail ?? '',
       password: '',
     },
   })
@@ -99,6 +102,10 @@ export function Login() {
           </div>
 
           {formError ? <p className="form-error">{formError}</p> : null}
+
+          {locationState?.registrationMessage ? (
+            <p className="form-success">{locationState.registrationMessage}</p>
+          ) : null}
 
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Ingresando...' : 'Ingresar'}
