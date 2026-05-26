@@ -8,6 +8,7 @@ import { AdminTickets } from '../pages/AdminTickets'
 import { Dashboard } from '../pages/Dashboard'
 import { Login } from '../pages/Login'
 import { Register } from '../pages/Register'
+import { Stats } from '../pages/Stats'
 import { TicketCreate } from '../pages/TicketCreate'
 import { TicketEdit } from '../pages/TicketEdit'
 import { Tickets } from '../pages/Tickets'
@@ -28,6 +29,7 @@ export function AppRouter() {
               <Route path="/tickets" element={<Tickets />} />
               <Route path="/tickets/new" element={<TicketCreate />} />
               <Route path="/tickets/:id/edit" element={<TicketEdit />} />
+              <Route path="/estadisticas" element={<Stats />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
 
               <Route element={<AdminRoute />}>

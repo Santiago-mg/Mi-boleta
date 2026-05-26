@@ -7,11 +7,15 @@ import { ErrorMessage } from '../components/ErrorMessage'
 import { Loading } from '../components/Loading'
 import { TicketForm } from '../components/TicketForm'
 import type { TicketSubmitPayload } from '../components/TicketForm'
+import { useToast } from '../context/ToastContext'
+import { useConfetti } from '../hooks/useConfetti'
 import type { Ticket } from '../types/ticket'
 
 export function TicketEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const toast = useToast()
+  const { fire: fireConfetti } = useConfetti()
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -66,9 +70,17 @@ export function TicketEdit() {
 
     try {
       await updateTicket(id, payload)
+
+      if (payload.status === 'Ganado') {
+        fireConfetti()
+        toast.success('🏆 ¡Boleta marcada como Ganada!')
+      } else {
+        toast.success('Boleta actualizada correctamente.')
+      }
+
       navigate('/tickets', { replace: true })
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No pudimos actualizar la boleta.'))
+      toast.error(getApiErrorMessage(requestError, 'No pudimos actualizar la boleta.'))
     } finally {
       setIsSubmitting(false)
     }

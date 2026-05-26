@@ -9,6 +9,7 @@ import { ErrorMessage } from '../components/ErrorMessage'
 import { Loading } from '../components/Loading'
 import { Pagination } from '../components/Pagination'
 import { TicketCard } from '../components/TicketCard'
+import { useToast } from '../context/ToastContext'
 import type { PaginationMeta } from '../types/api'
 import { GAME_TYPES, TICKET_STATUSES } from '../types/ticket'
 import type { GameType, Ticket, TicketFilters, TicketStatus } from '../types/ticket'
@@ -38,6 +39,7 @@ function buildTicketFilters(filters: FilterState, page: number): TicketFilters {
 }
 
 export function Tickets() {
+  const toast = useToast()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [meta, setMeta] = useState<PaginationMeta | undefined>()
   const [draftFilters, setDraftFilters] = useState<FilterState>(defaultFilters)
@@ -107,6 +109,7 @@ export function Tickets() {
 
     try {
       await deleteTicket(ticket.id)
+      toast.success(`"${ticket.title}" eliminada correctamente.`)
 
       if (tickets.length === 1 && page > 1) {
         setPage((currentPage) => currentPage - 1)
@@ -114,7 +117,9 @@ export function Tickets() {
         await loadTickets()
       }
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No pudimos eliminar el ticket.'))
+      const msg = getApiErrorMessage(requestError, 'No pudimos eliminar el ticket.')
+      setError(msg)
+      toast.error(msg)
     } finally {
       setDeletingId(null)
     }

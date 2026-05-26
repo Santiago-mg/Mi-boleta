@@ -3,24 +3,24 @@ import { useNavigate } from 'react-router-dom'
 
 import { getApiErrorMessage } from '../api/axiosClient'
 import { createTicket } from '../api/ticketsApi'
-import { ErrorMessage } from '../components/ErrorMessage'
 import { TicketForm } from '../components/TicketForm'
 import type { TicketSubmitPayload } from '../components/TicketForm'
+import { useToast } from '../context/ToastContext'
 
 export function TicketCreate() {
   const navigate = useNavigate()
-  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleCreate(payload: TicketSubmitPayload) {
     setIsSubmitting(true)
-    setError(null)
 
     try {
       await createTicket(payload)
+      toast.success('¡Boleta creada exitosamente!')
       navigate('/tickets', { replace: true })
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No pudimos crear la boleta.'))
+      toast.error(getApiErrorMessage(requestError, 'No pudimos crear la boleta.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -35,8 +35,6 @@ export function TicketCreate() {
           <p>Guarda la informacion clave para no perder de vista el sorteo.</p>
         </div>
       </section>
-
-      {error ? <ErrorMessage message={error} /> : null}
 
       <section className="content-panel">
         <TicketForm
