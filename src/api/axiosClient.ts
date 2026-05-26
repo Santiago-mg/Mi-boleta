@@ -11,6 +11,7 @@ export const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 })
 
 axiosClient.interceptors.request.use((config) => {
@@ -47,6 +48,14 @@ export function getApiErrorMessage(
   fallback = 'Ocurrio un error inesperado. Intentalo de nuevo.',
 ) {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    if (error.code === 'ECONNABORTED') {
+      return 'La API tardo demasiado en responder. Intentalo de nuevo.'
+    }
+
+    if (error.code === 'ERR_NETWORK') {
+      return 'No pudimos conectar con la API. Revisa tu conexion e intentalo de nuevo.'
+    }
+
     return (
       error.response?.data?.error ??
       error.response?.data?.message ??

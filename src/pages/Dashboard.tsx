@@ -16,13 +16,13 @@ import {
   getUpcomingTickets,
 } from '../utils/tickets'
 
-async function fetchAllTickets() {
-  const firstPage = await getTickets({ page: 1, pageSize: 100 })
+async function fetchAllTickets(signal?: AbortSignal) {
+  const firstPage = await getTickets({ page: 1, pageSize: 100 }, { signal })
   const totalPages = firstPage.meta?.totalPages ?? 1
   const tickets = [...firstPage.data]
 
   for (let page = 2; page <= totalPages; page += 1) {
-    const nextPage = await getTickets({ page, pageSize: 100 })
+    const nextPage = await getTickets({ page, pageSize: 100 }, { signal })
     tickets.push(...nextPage.data)
   }
 
@@ -34,22 +34,39 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadDashboard() {
+  async function loadDashboard(signal?: AbortSignal) {
     setIsLoading(true)
     setError(null)
 
     try {
-      const nextTickets = await fetchAllTickets()
+      const nextTickets = await fetchAllTickets(signal)
+
+      if (signal?.aborted) {
+        return
+      }
+
       setTickets(nextTickets)
     } catch (requestError) {
+      if (signal?.aborted) {
+        return
+      }
+
       setError(getApiErrorMessage(requestError, 'No pudimos cargar el dashboard.'))
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    void loadDashboard()
+    const controller = new AbortController()
+
+    void loadDashboard(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
   }, [])
 
   const summary = useMemo(() => {

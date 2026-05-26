@@ -1,5 +1,6 @@
 import { axiosClient } from './axiosClient'
 
+import type { AxiosRequestConfig } from 'axios'
 import type { ApiResponse, PaginatedResponse } from '../types/api'
 import type {
   CreateTicketPayload,
@@ -8,16 +9,24 @@ import type {
   UpdateTicketPayload,
 } from '../types/ticket'
 
-export async function getTickets(filters: TicketFilters = {}): Promise<PaginatedResponse<Ticket>> {
+type RequestOptions = Pick<AxiosRequestConfig, 'signal'>
+
+export async function getTickets(
+  filters: TicketFilters = {},
+  options: RequestOptions = {},
+): Promise<PaginatedResponse<Ticket>> {
   const response = await axiosClient.get<PaginatedResponse<Ticket>>('/tickets', {
     params: filters,
+    signal: options.signal,
   })
 
   return response.data
 }
 
-export async function getTicketById(id: string): Promise<Ticket> {
-  const response = await axiosClient.get<ApiResponse<Ticket>>(`/tickets/${id}`)
+export async function getTicketById(id: string, options: RequestOptions = {}): Promise<Ticket> {
+  const response = await axiosClient.get<ApiResponse<Ticket>>(`/tickets/${id}`, {
+    signal: options.signal,
+  })
 
   return response.data.data
 }

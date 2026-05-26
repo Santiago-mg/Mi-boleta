@@ -47,23 +47,40 @@ export function Tickets() {
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  async function loadTickets() {
+  async function loadTickets(signal?: AbortSignal) {
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await getTickets(buildTicketFilters(activeFilters, page))
+      const response = await getTickets(buildTicketFilters(activeFilters, page), { signal })
+
+      if (signal?.aborted) {
+        return
+      }
+
       setTickets(response.data)
       setMeta(response.meta)
     } catch (requestError) {
+      if (signal?.aborted) {
+        return
+      }
+
       setError(getApiErrorMessage(requestError, 'No pudimos cargar tus tickets.'))
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    void loadTickets()
+    const controller = new AbortController()
+
+    void loadTickets(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
   }, [activeFilters, page])
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {

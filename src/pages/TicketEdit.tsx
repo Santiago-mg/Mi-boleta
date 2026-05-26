@@ -17,7 +17,7 @@ export function TicketEdit() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadTicket() {
+  async function loadTicket(signal?: AbortSignal) {
     if (!id) {
       return
     }
@@ -26,17 +26,34 @@ export function TicketEdit() {
     setError(null)
 
     try {
-      const response = await getTicketById(id)
+      const response = await getTicketById(id, { signal })
+
+      if (signal?.aborted) {
+        return
+      }
+
       setTicket(response)
     } catch (requestError) {
+      if (signal?.aborted) {
+        return
+      }
+
       setError(getApiErrorMessage(requestError, 'No pudimos cargar la boleta.'))
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    void loadTicket()
+    const controller = new AbortController()
+
+    void loadTicket(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
   }, [id])
 
   async function handleUpdate(payload: TicketSubmitPayload) {

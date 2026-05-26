@@ -48,23 +48,40 @@ export function AdminTickets() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function loadTickets() {
+  async function loadTickets(signal?: AbortSignal) {
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await getAdminTickets(buildAdminFilters(activeFilters, page))
+      const response = await getAdminTickets(buildAdminFilters(activeFilters, page), { signal })
+
+      if (signal?.aborted) {
+        return
+      }
+
       setTickets(response.data)
       setMeta(response.meta)
     } catch (requestError) {
+      if (signal?.aborted) {
+        return
+      }
+
       setError(getApiErrorMessage(requestError, 'No pudimos cargar los tickets de administracion.'))
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    void loadTickets()
+    const controller = new AbortController()
+
+    void loadTickets(controller.signal)
+
+    return () => {
+      controller.abort()
+    }
   }, [activeFilters, page])
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
