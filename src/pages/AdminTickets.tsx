@@ -25,7 +25,7 @@ const defaultFilters: AdminFilterState = {
   status: '',
   gameType: '',
   userId: '',
-  pageSize: 10,
+  pageSize: 50,
 }
 
 function buildAdminFilters(filters: AdminFilterState, page: number): AdminTicketFilters {
@@ -86,9 +86,12 @@ export function AdminTickets() {
           <span className="section-kicker">Administracion</span>
           <h1>
             <ShieldCheck size={34} />
-            Tickets globales
+            Todos los tickets registrados
           </h1>
-          <p>Consulta todos los tickets, filtra por estado, tipo, usuario o busqueda general.</p>
+          <p>Consulta todos los tickets registrados, filtra por estado, tipo, usuario o busqueda general.</p>
+          {meta ? (
+            <p className="admin-summary">Mostrando {tickets.length} de {meta.total} tickets registrados.</p>
+          ) : null}
         </div>
       </section>
 
@@ -176,9 +179,9 @@ export function AdminTickets() {
               }))
             }
           >
-            <option value={10}>10</option>
             <option value={20}>20</option>
             <option value={50}>50</option>
+            <option value={100}>100</option>
           </select>
         </div>
 
