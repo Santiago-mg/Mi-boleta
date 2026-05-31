@@ -191,8 +191,6 @@ function AreaChart({ data }: { data: TimePoint[] }) {
     })
     const line = `M ${points.join(' L ')}`
     if (!fill) return line
-    const last = data[data.length - 1]
-    const first = data[0]
     const lastX = paddingX + ((data.length - 1) / Math.max(data.length - 1, 1)) * chartW
     const firstX = paddingX
     return `${line} L ${lastX},${paddingY + chartH} L ${firstX},${paddingY + chartH} Z`

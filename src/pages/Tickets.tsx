@@ -3,10 +3,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { getAdminTickets } from '../api/adminApi'
 import { getApiErrorMessage } from '../api/axiosClient'
 import { deleteTicket, getTickets } from '../api/ticketsApi'
-import { useAuth } from '../context/AuthContext'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { Loading } from '../components/Loading'
 import { Pagination } from '../components/Pagination'
@@ -41,9 +39,7 @@ function buildTicketFilters(filters: FilterState, page: number): TicketFilters {
 }
 
 export function Tickets() {
-  const { user } = useAuth()
   const toast = useToast()
-  const [allTickets, setAllTickets] = useState<Ticket[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [meta, setMeta] = useState<PaginationMeta | undefined>()
   const [draftFilters, setDraftFilters] = useState<FilterState>(defaultFilters)
@@ -58,50 +54,14 @@ export function Tickets() {
     setError(null)
 
     try {
-      let allData: Ticket[] = []
-
-      // If admin, load 2000 records in parallel
-      if (user?.role === 'admin') {
-        const pageRequests = []
-        for (let p = 1; p <= 20; p++) {
-          pageRequests.push(getAdminTickets({ page: p, pageSize: 100 }, { signal }))
-        }
-        const results = await Promise.all(pageRequests)
-        for (const result of results) {
-          allData.push(...result.data)
-        }
-        allData = allData.slice(0, 2000)
-      } else {
-        // Non-admin: load user tickets normally
-        const response = await getTickets(buildTicketFilters(activeFilters, page), { signal })
-        allData = response.data
-        setMeta(response.meta)
-      }
+      const response = await getTickets(buildTicketFilters(activeFilters, page), { signal })
 
       if (signal?.aborted) {
         return
       }
 
-      setAllTickets(allData)
-      
-      // Apply pagination for admin
-      if (user?.role === 'admin') {
-        const pageSize = activeFilters.pageSize
-        const pageNumber = page
-        const startIndex = (pageNumber - 1) * pageSize
-        const endIndex = startIndex + pageSize
-        const paginatedData = allData.slice(startIndex, endIndex)
-        
-        setTickets(paginatedData)
-        setMeta({
-          page: pageNumber,
-          pageSize,
-          total: allData.length,
-          totalPages: Math.ceil(allData.length / pageSize),
-        })
-      } else {
-        setTickets(allData)
-      }
+      setTickets(response.data)
+      setMeta(response.meta)
     } catch (requestError) {
       if (signal?.aborted) {
         return
@@ -123,7 +83,7 @@ export function Tickets() {
     return () => {
       controller.abort()
     }
-  }, [user?.role, activeFilters, page])
+  }, [activeFilters, page])
 
   function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -170,16 +130,14 @@ export function Tickets() {
       <section className="page-header">
         <div>
           <span className="section-kicker">Historial</span>
-          <h1>{user?.role === 'admin' ? 'Todos los tickets' : 'Mis tickets'}</h1>
-          <p>{user?.role === 'admin' ? 'Consulta los 2000 tickets más recientes del sistema.' : 'Busca, filtra y administra todas tus boletas registradas.'}</p>
+          <h1>Mis tickets</h1>
+          <p>Busca, filtra y administra todas tus boletas registradas.</p>
         </div>
 
-        {user?.role !== 'admin' && (
-          <Link className="primary-button" to="/tickets/new">
-            <Plus size={18} />
-            Nueva boleta
-          </Link>
-        )}
+        <Link className="primary-button" to="/tickets/new">
+          <Plus size={18} />
+          Nueva boleta
+        </Link>
       </section>
 
       <form className="filters-panel" onSubmit={handleApplyFilters}>
