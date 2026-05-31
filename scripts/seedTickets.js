@@ -1,7 +1,28 @@
-import axios from 'axios'
+// scripts/seedTickets.js
+// Inserta 1000+ tickets de prueba usando fetch nativo (Node 18+)
+// Uso: node scripts/seedTickets.js
+//   o: npm run seed:tickets
+
+const API_URL = process.env.VITE_API_URL ?? 'https://mi-boleta-api-y9dv.onrender.com/api/v1'
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@miboleta.com'
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Password123!'
+const TOTAL = Number(process.env.SEED_TOTAL) || 1050
+const BATCH_SIZE = Number(process.env.SEED_CONCURRENCY) || 8
+const DELAY_MS = 150
 
 const GAME_TYPES = ['Lotería', 'Rifa', 'Sorteo', 'Boleta', 'Juego ocasional']
 const TICKET_STATUSES = ['Pendiente', 'Ganado', 'Perdido']
+
+const PLACES = [
+  'Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena',
+  'Bucaramanga', 'Pereira', 'Manizales', 'Santa Marta', 'Cúcuta',
+  'Ibagué', 'Villavicencio', 'Pasto', 'Neiva', 'Armenia',
+]
+
+const TITLE_WORDS = [
+  'Gran', 'Suerte', 'Especial', 'Dorado', 'Mágico', 'Plateado',
+  'Sorteo', 'Super', 'Mega', 'Premio', 'Nacional', 'Regional',
+]
 
 function randItem(arr) {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -11,140 +32,127 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function randomTitle(i) {
-  const words = ['Gran', 'Suerte', 'Noche', 'Especial', 'Sorteo', 'Super']
-  return `${randItem(words)} ticket #${i}`
-}
-
 function randomDate() {
+  // Fechas entre 2 años atrás y hoy
   const daysAgo = randInt(0, 365 * 2)
   const d = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
-  return d.toISOString()
+  return d.toISOString().split('T')[0]
 }
 
-function randomPlace() {
-  const places = ['Sala 1', 'Local Centro', 'Plaza Norte', 'Auditorio', 'Online']
-  return randItem(places)
+function generateTicket(index) {
+  const status = randItem(TICKET_STATUSES)
+  const gameType = randItem(GAME_TYPES)
+  return {
+    title: `${randItem(TITLE_WORDS)} ${randItem(TITLE_WORDS)} #${index}`,
+    gameType,
+    gameNumber: String(randInt(1000, 99999)),
+    gameDate: randomDate(),
+    amount: randInt(1000, 500000),
+    place: randItem(PLACES),
+    status,
+    notes: Math.random() > 0.6
+      ? `Boleta de prueba – ${gameType} – ${status}`
+      : undefined,
+  }
 }
 
-async function createTicket(client, payload) {
-  const resp = await client.post('/tickets', payload)
-  return resp.data
-}
-
-async function main() {
-  const baseURL = process.env.VITE_API_URL || 'https://mi-boleta-api-y9dv.onrender.com/api/v1'
-  let token = process.env.SEED_ADMIN_TOKEN || ''
-  const adminEmail = process.env.SEED_ADMIN_EMAIL
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD
-
-  const client = axios.create({
-    baseURL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    timeout: 30000,
+async function login() {
+  console.log(`\n🔑  Autenticando como ${ADMIN_EMAIL}…`)
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
   })
 
-  async function login(email, password) {
-    try {
-      const resp = await client.post('/auth/login', { email, password })
-      const tokenFromResp = resp?.data?.data?.token || resp?.data?.token
-      if (!tokenFromResp) {
-        throw new Error('No se obtuvo token en el login')
-      }
-      console.log('Obtenido token para', email)
-      return tokenFromResp
-    } catch (err) {
-      throw new Error('Login fallido: ' + (err?.message || String(err)))
-    }
+  const json = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new Error(`Login falló (${res.status}): ${JSON.stringify(json)}`)
   }
 
-  async function registerAndLogin() {
-    const name = `seed user ${Date.now()}`
-    const email = `seeduser+${Date.now()}@example.com`
-    const password = `SeedPass!${randInt(1000, 9999)}`
-
-    try {
-      await client.post('/auth/register', { name, email, password })
-      console.log('Usuario registrado:', email)
-    } catch (err) {
-      console.log('Registro (posible duplicado) ignorado')
-    }
-
-    return login(email, password)
-  }
+  // Intentar extraer token de distintas estructuras posibles
+  const token =
+    json?.data?.token ??
+    json?.token ??
+    json?.access_token ??
+    json?.data?.access_token
 
   if (!token) {
-    if (adminEmail && adminPassword) {
-      try {
-        token = await login(adminEmail, adminPassword)
-      } catch (err) {
-        console.error('Login con credenciales admin fallido:', err?.message || err)
-        process.exit(1)
-      }
-    } else {
-      try {
-        token = await registerAndLogin()
-      } catch (err) {
-        console.error('No se pudo obtener token automático:', err?.message || err)
-        console.error('Pasa SEED_ADMIN_TOKEN o SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD para intentar de nuevo')
-        process.exit(1)
-      }
-    }
+    throw new Error(`No se encontró token en la respuesta: ${JSON.stringify(json)}`)
   }
 
-  // attach token to client
-  client.defaults.headers.Authorization = `Bearer ${token}`
+  console.log('✅  Login exitoso.\n')
+  return token
+}
 
-  const total = Number(process.env.SEED_TOTAL) || 1000
-  const concurrency = Number(process.env.SEED_CONCURRENCY) || 50
+async function postTicket(token, payload, idx) {
+  const res = await fetch(`${API_URL}/tickets`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  })
 
-  console.log(`Seeding ${total} tickets to ${baseURL} (concurrency ${concurrency})`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status} en ticket ${idx}: ${body.slice(0, 200)}`)
+  }
 
-  const batches = []
-  for (let i = 0; i < total; i += concurrency) {
+  return res.json()
+}
+
+async function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+async function seed() {
+  // ── Login ─────────────────────────────────────────────────────
+  let token
+  try {
+    token = await login()
+  } catch (err) {
+    console.error('❌  Error de autenticación:', err.message)
+    process.exit(1)
+  }
+
+  // ── Seed en lotes ─────────────────────────────────────────────
+  console.log(`🚀  Insertando ${TOTAL} tickets (lotes de ${BATCH_SIZE})…\n`)
+
+  let ok = 0
+  let fail = 0
+
+  for (let i = 0; i < TOTAL; i += BATCH_SIZE) {
+    const end = Math.min(i + BATCH_SIZE, TOTAL)
     const batch = []
-    for (let j = 0; j < concurrency && i + j < total; j++) {
-      const idx = i + j + 1
-      const payload = {
-        title: randomTitle(idx),
-        gameType: randItem(GAME_TYPES),
-        gameNumber: `${randInt(1, 9999)}`,
-        gameDate: randomDate(),
-        amount: randInt(100, 10000),
-        place: randomPlace(),
-        status: randItem(TICKET_STATUSES),
-        notes: Math.random() > 0.7 ? 'Generado por seed' : undefined,
-      }
 
+    for (let j = i; j < end; j++) {
+      const idx = j + 1
       batch.push(
-        createTicket(client, payload)
-          .then(() => ({ ok: true, idx }))
-          .catch((err) => ({ ok: false, idx, error: err?.message || String(err) })),
+        postTicket(token, generateTicket(idx), idx)
+          .then(() => { ok++ })
+          .catch((err) => {
+            fail++
+            if (fail <= 5) console.warn(`  ⚠️  ${err.message}`)
+          }),
       )
     }
 
-    batches.push(Promise.all(batch))
+    await Promise.all(batch)
+
+    const pct = Math.round((end / TOTAL) * 100)
+    process.stdout.write(
+      `\r  Progreso: ${end}/${TOTAL} (${pct}%)  ✅ ${ok} ok  ❌ ${fail} errores   `,
+    )
+
+    if (end < TOTAL) await delay(DELAY_MS)
   }
 
-  let created = 0
-  let failed = 0
-
-  for (const b of batches) {
-    // eslint-disable-next-line no-await-in-loop
-    const results = await b
-    for (const r of results) {
-      if (r.ok) created++
-      else failed++
-    }
-    console.log(`Progress: created=${created} failed=${failed}`)
-  }
-
-  console.log(`Done. created=${created} failed=${failed}`)
+  console.log(`\n\n✨  Seed completado:`)
+  console.log(`   ✅  Tickets insertados: ${ok}`)
+  console.log(`   ❌  Errores:            ${fail}`)
+  console.log(`\n🎯  Recarga la vista admin en el navegador para ver los registros nuevos.\n`)
 }
 
-main().catch((err) => {
-  console.error('Seeder failed:', err?.message || err)
-  process.exit(1)
-})
+seed()

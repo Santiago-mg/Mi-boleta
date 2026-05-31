@@ -2,8 +2,10 @@ import { CalendarClock, CircleCheckBig, CircleX, Plus, Radar, Ticket } from 'luc
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { getAdminTickets } from '../api/adminApi'
 import { getApiErrorMessage } from '../api/axiosClient'
 import { getTickets } from '../api/ticketsApi'
+import { useAuth } from '../context/AuthContext'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { Loading } from '../components/Loading'
 import type { Ticket as TicketType } from '../types/ticket'
@@ -16,20 +18,38 @@ import {
   getUpcomingTickets,
 } from '../utils/tickets'
 
-async function fetchAllTickets(signal?: AbortSignal) {
-  const firstPage = await getTickets({ page: 1, pageSize: 100 }, { signal })
-  const totalPages = firstPage.meta?.totalPages ?? 1
-  const tickets = [...firstPage.data]
-
-  for (let page = 2; page <= totalPages; page += 1) {
-    const nextPage = await getTickets({ page, pageSize: 100 }, { signal })
-    tickets.push(...nextPage.data)
+async function fetchAllTickets(signal?: AbortSignal, isAdmin = false) {
+  const apiCall = isAdmin ? getAdminTickets : getTickets
+  
+  if (!isAdmin) {
+    // Non-admin: load user tickets only
+    const firstPage = await apiCall({ page: 1, pageSize: 100 }, { signal })
+    const totalPages = firstPage.meta?.totalPages ?? 1
+    const tickets = [...firstPage.data]
+    for (let page = 2; page <= totalPages; page++) {
+      const next = await apiCall({ page, pageSize: 100 }, { signal })
+      tickets.push(...next.data)
+    }
+    return tickets
   }
 
-  return tickets
+  // Admin: load 2000 records in parallel
+  const pageRequests = []
+  for (let page = 1; page <= 20; page++) {
+    pageRequests.push(apiCall({ page, pageSize: 100 }, { signal }))
+  }
+  
+  const results = await Promise.all(pageRequests)
+  const tickets: typeof results[0]['data'] = []
+  for (const result of results) {
+    tickets.push(...result.data)
+  }
+  
+  return tickets.slice(0, 2000)
 }
 
 export function Dashboard() {
+  const { user } = useAuth()
   const [tickets, setTickets] = useState<TicketType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +59,8 @@ export function Dashboard() {
     setError(null)
 
     try {
-      const nextTickets = await fetchAllTickets(signal)
+      const isAdmin = user?.role === 'admin'
+      const nextTickets = await fetchAllTickets(signal, isAdmin)
 
       if (signal?.aborted) {
         return
@@ -67,7 +88,7 @@ export function Dashboard() {
     return () => {
       controller.abort()
     }
-  }, [])
+  }, [user?.role])
 
   const summary = useMemo(() => {
     const pending = tickets.filter((ticket) => ticket.status === 'Pendiente')

@@ -1,8 +1,10 @@
 import { BarChart2, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { getAdminTickets } from '../api/adminApi'
 import { getApiErrorMessage } from '../api/axiosClient'
 import { getTickets } from '../api/ticketsApi'
+import { useAuth } from '../context/AuthContext'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { Loading } from '../components/Loading'
 import type { Ticket } from '../types/ticket'
@@ -10,15 +12,34 @@ import { formatCurrency } from '../utils/tickets'
 
 // ─── Helpers ────────────────────────────────────────────────
 
-async function fetchAllTickets(signal?: AbortSignal) {
-  const firstPage = await getTickets({ page: 1, pageSize: 100 }, { signal })
-  const totalPages = firstPage.meta?.totalPages ?? 1
-  const tickets = [...firstPage.data]
-  for (let page = 2; page <= totalPages; page++) {
-    const next = await getTickets({ page, pageSize: 100 }, { signal })
-    tickets.push(...next.data)
+async function fetchAllTickets(signal?: AbortSignal, isAdmin = false) {
+  const apiCall = isAdmin ? getAdminTickets : getTickets
+  
+  if (!isAdmin) {
+    // Non-admin: load user tickets only
+    const firstPage = await apiCall({ page: 1, pageSize: 100 }, { signal })
+    const totalPages = firstPage.meta?.totalPages ?? 1
+    const tickets = [...firstPage.data]
+    for (let page = 2; page <= totalPages; page++) {
+      const next = await apiCall({ page, pageSize: 100 }, { signal })
+      tickets.push(...next.data)
+    }
+    return tickets
   }
-  return tickets
+
+  // Admin: load 2000 records in parallel
+  const pageRequests = []
+  for (let page = 1; page <= 20; page++) {
+    pageRequests.push(apiCall({ page, pageSize: 100 }, { signal }))
+  }
+  
+  const results = await Promise.all(pageRequests)
+  const tickets: typeof results[0]['data'] = []
+  for (const result of results) {
+    tickets.push(...result.data)
+  }
+  
+  return tickets.slice(0, 2000)
 }
 
 // ─── Bar Chart ───────────────────────────────────────────────
@@ -303,6 +324,7 @@ function WinRateGauge({ won, total }: { won: number; total: number }) {
 // ─── Main Page ───────────────────────────────────────────────
 
 export function Stats() {
+  const { user } = useAuth()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -311,7 +333,8 @@ export function Stats() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await fetchAllTickets(signal)
+      const isAdmin = user?.role === 'admin'
+      const data = await fetchAllTickets(signal, isAdmin)
       if (signal?.aborted) return
       setTickets(data)
     } catch (err) {
@@ -326,7 +349,7 @@ export function Stats() {
     const controller = new AbortController()
     void loadStats(controller.signal)
     return () => controller.abort()
-  }, [])
+  }, [user?.role])
 
   const stats = useMemo(() => {
     const byStatus = [
